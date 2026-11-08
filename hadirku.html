@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F5F7FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1424" media="(prefers-color-scheme: dark)">
+<title>HADIRKU</title>
+<style>
+:root{--bg:#F5F7FA;--card:#FFFFFF;--ink:#1B2433;--mut:#5B6779;--line:#DDE3EC;--navy:#17356B;--on:#FFFFFF;--soft:#E6EEF9;--link:#1F5FBF;--shadow:0 1px 2px rgba(10,31,68,.06),0 6px 18px rgba(10,31,68,.06)}
+@media(prefers-color-scheme:dark){:root{--bg:#0B1424;--card:#121C30;--ink:#E8EEF8;--mut:#9AA9C2;--line:#25324A;--navy:#8DB4F0;--on:#0B1424;--soft:#1A2B4A;--link:#8DB4F0;--shadow:none}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+.top{width:100%;max-width:960px;margin:0 auto;padding:20px 20px 0;display:flex;align-items:center;gap:12px}
+.logo{flex:none;width:44px;height:44px;border-radius:12px;background:var(--navy);display:grid;place-items:center}
+.logo svg{width:26px;height:26px;stroke:var(--on);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.brand b{display:block;font-size:20px;letter-spacing:.3px;line-height:1.2}
+.brand span{display:block;color:var(--mut);font-size:14px}
+main{flex:1;width:100%;max-width:960px;margin:0 auto;padding:36px 20px 24px}
+h1{font-size:28px;line-height:1.25;margin:0 0 8px;letter-spacing:-.2px}
+.lead{margin:0 0 28px;color:var(--mut);font-size:16px;max-width:34em}
+.grid{display:grid;gap:14px;grid-template-columns:1fr}
+.card{display:flex;flex-direction:column;gap:8px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);color:inherit;text-decoration:none;transition:border-color .15s,transform .15s}
+.card:hover{border-color:var(--navy);transform:translateY(-2px)}
+.card:active{transform:scale(.99)}
+.card:focus-visible{outline:3px solid var(--link);outline-offset:3px}
+.ico{width:48px;height:48px;border-radius:12px;background:var(--soft);display:grid;place-items:center;color:var(--navy);margin-bottom:6px}
+.ico svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+h2{font-size:20px;line-height:1.3;margin:0}
+.chip{font-size:12.5px;font-weight:600;color:var(--navy);background:var(--soft);padding:2px 10px;border-radius:999px;white-space:nowrap}
+.card p{margin:0;color:var(--mut);font-size:15px}
+.go{margin-top:auto;padding-top:12px;display:flex;align-items:center;gap:8px;min-height:44px;color:var(--link);font-weight:600}
+.go svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.card:hover .go svg{transform:translateX(3px)}
+footer{width:100%;max-width:960px;margin:0 auto;padding:8px 20px 28px;color:var(--mut);font-size:13.5px}
+@media(min-width:760px){
+  .top{padding-top:28px}
+  main{padding-top:56px}
+  h1{font-size:36px}
+  .grid{grid-template-columns:repeat(3,1fr);gap:18px}
+}
+@media(prefers-reduced-motion:reduce){.card,.go svg{transition:none}.card:hover,.card:active{transform:none}.card:hover .go svg{transform:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+  <div class="brand"><b>HADIRKU</b><span id="sch">Sistem Jurnal Kehadiran Mengajar</span></div>
+</header>
+
+<main>
+  <h1>Pilih akses Anda</h1>
+  <p class="lead">Masuk sesuai peran untuk melihat jadwal, mencatat kehadiran mengajar, atau mengelola data sekolah.</p>
+
+  <div class="grid">
+    <a class="card" href="hadirku-murid.html">
+      <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 5.5C4.5 4.3 7.5 4.5 12 7c4.5-2.5 7.5-2.7 10-1.5V19c-2.500-1.200-5.500-1-10 1.500C7.500 18 4.500 17.800 2 19z"/><path d="M12 7v13.500"/></svg></div>
+      <div class="row"><h2>Murid</h2><span class="chip">Tanpa login</span></div>
+      <p>Lihat jadwal pelajaran, kabar guru berhalangan hadir, dan tugas dari guru.</p>
+      <span class="go">Buka jadwal kelas <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </a>
+
+    <a class="card" href="hadirku-guru.html">
+      <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.500"/><path d="M2.500 20c.6-3.600 3.200-5.500 6.500-5.500s5.900 1.900 6.500 5.500"/><path d="M16.500 10.500l2 2 3.500-4"/></svg></div>
+      <div class="row"><h2>Guru</h2><span class="chip">Perlu login</span></div>
+      <p>Catat kehadiran mengajar, isi jurnal, dan bagikan tugas kepada murid.</p>
+      <span class="go">Masuk sebagai guru <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </a>
+
+    <a class="card" href="hadirku-admin.html">
+      <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v5.500c0 4.700-3.200 8.200-8 9.500-4.800-1.300-8-4.800-8-9.500V6z"/><path d="M8.500 12l2.500 2.500 4.500-5"/></svg></div>
+      <div class="row"><h2>Admin</h2><span class="chip">Perlu login</span></div>
+      <p>Kelola guru, jadwal, kelas, dan mata pelajaran, serta pantau rekap kehadiran.</p>
+      <span class="go">Masuk sebagai admin <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </a>
+  </div>
+</main>
+
+<footer>Informasi jadwal dan tugas bersumber dari jurnal guru dan dapat berubah sewaktu-waktu. Butuh bantuan akun? Hubungi admin sekolah.</footer>
+
+<script src="config.js"></script>
+<script>
+(function(){
+  var c=window.HADIRKU_CFG;
+  if(!c||!c.url||!c.key)return;
+  fetch(c.url+'/rest/v1/rpc/portal_nama_sekolah',{method:'POST',headers:{apikey:c.key,'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r.ok?r.json():null})
+    .then(function(n){if(typeof n==='string'&&n.trim())document.getElementById('sch').textContent=n.trim()})
+    .catch(function(){});
+})();
+</script>
+</body>
+</html>
