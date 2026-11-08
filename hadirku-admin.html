@@ -136,8 +136,8 @@ async function vJadwal(){
 async function vMaster(){
   const [k,m]=await Promise.all([q(sb.from('kelas').select('*').order('nama_kelas')),q(sb.from('mapels').select('*').order('nama_mapel'))]);
   const blk=(t,tb,col,a,ex)=>`<h2>${t} (${a.length})</h2><form class="inl" data-form="add" data-tb="${tb}" data-col="${col}"><input name="v" placeholder="Nama baru" required>${ex||''}<button>Tambah</button></form>
-  <div class="list">${a.map(x=>`<div class="row"><div><b>${esc(x[col])}</b>${tb==='kelas'?`<small>${x.jenis==='peminatan'?'Peminatan':'Reguler'}</small>`:''}</div><button class="ghost bad" data-act="del" data-tb="${tb}" data-id="${x.id}">Hapus</button></div>`).join('')||'<p class="empty">Belum ada data.</p>'}</div>`;
-  return blk('Kelas','kelas','nama_kelas',k,'<select name="jenis" style="width:auto;flex:none"><option value="reguler">Reguler</option><option value="peminatan">Peminatan</option></select>')+blk('Mata pelajaran','mapels','nama_mapel',m);
+  <div class="list">${a.map(x=>`<div class="row"><div><b>${esc(x[col])}</b>${tb==='mapels'&&x.peminatan?'<small>Peminatan</small>':''}</div><button class="ghost bad" data-act="del" data-tb="${tb}" data-id="${x.id}">Hapus</button></div>`).join('')||'<p class="empty">Belum ada data.</p>'}</div>`;
+  return blk('Kelas','kelas','nama_kelas',k)+blk('Mata pelajaran','mapels','nama_mapel',m,'<select name="peminatan" style="width:auto;flex:none"><option value="false">Umum</option><option value="true">Peminatan</option></select>');
 }
 async function vSet(){
   const s=await q(sb.from('school_settings').select('*').eq('id',1).single());
@@ -170,7 +170,7 @@ async function act(el){
 }
 async function submit(f){
   const t=f.dataset.form,d=Object.fromEntries(new FormData(f));
-  if(t==='add'){const row={[f.dataset.col]:d.v.trim()};if(d.jenis)row.jenis=d.jenis;await q(sb.from(f.dataset.tb).insert(row))}
+  if(t==='add'){const row={[f.dataset.col]:d.v.trim()};if(d.peminatan)row.peminatan=d.peminatan==='true';await q(sb.from(f.dataset.tb).insert(row))}
   if(t==='jadwal'){d.hari_id=+d.hari_id;await q(sb.from('schedules').insert(d))}
   if(t==='set'){d.attendance_window_minutes=+d.attendance_window_minutes;await q(sb.from('school_settings').update(d).eq('id',1))}
   toast('Tersimpan.');render();
