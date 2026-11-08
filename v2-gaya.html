@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>HADIRKU v2 - Panduan Gaya</title>
+<link rel="stylesheet" href="hadirku-v2.css">
+<style>
+.sec-t{margin:32px 0 12px}.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+.sw div{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;font-size:.75rem}
+.sw i{display:block;height:44px}.sw span{display:block;padding:4px 8px;background:var(--card)}
+.g2{display:grid;gap:12px}@media(min-width:640px){.g2{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+<nav class="nav" aria-label="Contoh navigasi">
+  <a href="#dasar" data-icon="book" aria-current="page"><span>Dasar</span></a>
+  <a href="#form" data-icon="list"><span>Form</span></a>
+  <a href="#data" data-icon="chart"><span>Data</span></a>
+  <a href="#status" data-icon="info"><span>Status</span></a>
+</nav>
+<main class="main">
+  <h1 class="h1">Panduan gaya HADIRKU</h1>
+  <p class="mut">Contoh komponen yang akan dipakai bersama oleh aplikasi Guru, Admin, dan Murid.</p>
+
+  <section id="dasar">
+    <h2 class="h2 sec-t">Warna</h2>
+    <div class="sw">
+      <div><i style="background:var(--navy)"></i><span>Utama</span></div>
+      <div><i style="background:var(--soft)"></i><span>Biru muda</span></div>
+      <div><i style="background:var(--bg)"></i><span>Latar</span></div>
+      <div><i style="background:var(--ink)"></i><span>Teks</span></div>
+      <div><i style="background:var(--ok)"></i><span>Berhasil</span></div>
+      <div><i style="background:var(--warn)"></i><span>Peringatan</span></div>
+      <div><i style="background:var(--bad)"></i><span>Kesalahan</span></div>
+    </div>
+    <h2 class="h2 sec-t">Tipografi</h2>
+    <div class="card stack">
+      <p class="h1">Judul halaman</p><p class="h2">Judul bagian</p><p class="h3">Judul kartu</p>
+      <p>Teks isi dibuat jelas dan nyaman dibaca di layar HP.</p><p class="mut t-sm">Teks pendukung dengan warna lebih redup.</p>
+    </div>
+    <h2 class="h2 sec-t">Tombol</h2>
+    <div class="row wrap">
+      <button class="btn" data-icon="check">Utama</button><button class="btn sec">Sekunder</button>
+      <button class="btn ghost">Teks</button><button class="btn danger" data-icon="trash">Hapus</button>
+      <button class="btn" disabled>Nonaktif</button><button class="btn" id="bs">Simpan</button>
+    </div>
+  </section>
+
+  <section id="form">
+    <h2 class="h2 sec-t">Form</h2>
+    <div class="card stack">
+      <div class="field"><label for="n">Nama lengkap</label><input id="n" class="input" placeholder="Contoh: Siti Aminah, S.Pd."><span class="hint">Tulis sesuai data sekolah.</span></div>
+      <div class="field invalid"><label for="e">Email</label><input id="e" class="input" value="guru@"><span class="err">Alamat email belum lengkap.</span></div>
+      <div class="field"><label for="k">Kelas</label><select id="k" class="input"><option>X-1</option><option>XI-3</option></select></div>
+      <div><p class="lbl" style="margin-bottom:8px">Kategori alasan</p>
+        <div class="chips" id="ch"><button class="chip" aria-pressed="true">Sakit</button><button class="chip" aria-pressed="false">Izin Dinas</button><button class="chip" aria-pressed="false">Izin Pribadi</button><button class="chip" aria-pressed="false">Cuti</button></div></div>
+      <div class="field"><label for="t">Tugas untuk siswa</label><textarea id="t" class="input"></textarea></div>
+      <div><p class="lbl" style="margin-bottom:8px">Foto tugas (maksimal 1)</p>
+        <button class="drop" id="drop" type="button"><span data-icon="camera"></span><b>Ambil atau pilih foto</b><span class="t-xs">Ukuran diperkecil otomatis</span></button>
+        <input type="file" id="foto" accept="image/*" hidden></div>
+      <label class="switch"><input type="checkbox"><span>Tampilkan ke murid</span></label>
+      <button class="btn block">Kirim jurnal</button>
+    </div>
+  </section>
+
+  <section id="data">
+    <h2 class="h2 sec-t">Kartu sesi dan status</h2>
+    <div class="g2">
+      <div class="card stack"><div class="row between"><b class="num">07.00 sampai 07.45</b><span class="badge ok">Guru hadir</span></div>
+        <div><p class="h3">Matematika</p><p class="mut t-sm">Aren Anyan, S.Pd. <span class="badge plain mut">Reguler</span></p></div></div>
+      <div class="card stack"><div class="row between"><b class="num">07.45 sampai 08.30</b><span class="badge warn">Guru berhalangan hadir</span></div>
+        <div><p class="h3">MAT 2</p><p class="mut t-sm">Peminatan, ruang XI-2</p></div>
+        <div class="alert"><span data-icon="book"></span><div><b>Tugas dari guru</b><br>Kerjakan soal latihan halaman 45.</div></div></div>
+      <div class="card stack"><div class="row between"><b class="num">08.30 sampai 09.15</b><span class="badge mut">Terjadwal</span></div>
+        <p class="h3">Bahasa Indonesia</p>
+        <div><p class="mut t-sm">Sisa waktu mencatat</p><p class="cd urgent">02:41</p></div>
+        <button class="btn block" data-icon="check">Saya Masuk Kelas</button></div>
+      <div class="card stack"><div class="row between"><b class="num">09.15 sampai 10.00</b><span class="badge bad">Terlewat</span></div><p class="h3">Fisika</p></div>
+    </div>
+    <h2 class="h2 sec-t">Tabel dan pencarian</h2>
+    <div class="row wrap" style="margin-bottom:12px">
+      <div class="search"><span data-icon="search"></span><input class="input" placeholder="Cari guru atau mapel" aria-label="Cari"></div>
+      <button class="btn sec" data-icon="filter">Filter</button>
+    </div>
+    <table class="tbl"><thead><tr><th>Guru</th><th>Mapel</th><th>Jam</th><th>Status</th></tr></thead><tbody>
+      <tr><td data-label="Guru">Aren Anyan, S.Pd.</td><td data-label="Mapel">MAT 1</td><td data-label="Jam" class="num">07.00</td><td data-label="Status"><span class="badge ok">Hadir</span></td></tr>
+      <tr><td data-label="Guru">Erlina, S.Pt</td><td data-label="Mapel">BIO 2</td><td data-label="Jam" class="num">08.30</td><td data-label="Status"><span class="badge bad">Terlewat</span></td></tr>
+      <tr><td data-label="Guru">Heru, S.Pd.</td><td data-label="Mapel">SOS 1</td><td data-label="Jam" class="num">10.15</td><td data-label="Status"><span class="badge mut">Terjadwal</span></td></tr>
+    </tbody></table>
+  </section>
+
+  <section id="status">
+    <h2 class="h2 sec-t">Kondisi halaman</h2>
+    <div class="stack">
+      <div class="card"><div class="empty"><span data-icon="calendar"></span><p>Tidak ada pelajaran pada tanggal ini.</p><button class="btn sec sm">Ganti tanggal</button></div></div>
+      <div id="sk"></div>
+      <div id="er"></div>
+      <div class="alert ok"><span data-icon="check"></span><div>Jurnal berhasil disimpan.</div></div>
+      <div class="alert warn"><span data-icon="alert"></span><div>Waktu pencatatan tinggal 3 menit.</div></div>
+    </div>
+    <h2 class="h2 sec-t">Dialog dan notifikasi</h2>
+    <div class="row wrap">
+      <button class="btn danger" id="d1" data-icon="trash">Konfirmasi hapus</button>
+      <button class="btn sec" id="d2">Lembar isian</button>
+      <button class="btn sec" id="t1">Notifikasi berhasil</button>
+      <button class="btn sec" id="t2">Notifikasi gagal</button>
+    </div>
+  </section>
+</main>
+</div>
+<script src="hadirku-v2.js"></script>
+<script>
+HK.ready(function(){
+  var $=function(s){return document.querySelector(s)};
+  $('#sk').innerHTML=HK.skel(1);
+  $('#er').innerHTML=HK.alert('bad','Data belum dapat dimuat. Periksa koneksi internet Anda.','<button class="btn sm danger" id="rt">Coba lagi</button>');
+  $('#rt').onclick=function(){HK.toast('Memuat ulang…')};
+  $('#bs').onclick=function(e){HK.busy(e.currentTarget,function(){return new Promise(function(r){setTimeout(r,1500)})}).then(function(){HK.toast('Tersimpan.')})};
+  $('#ch').onclick=function(e){var b=e.target.closest('.chip');if(!b)return;this.querySelectorAll('.chip').forEach(function(c){c.setAttribute('aria-pressed',c===b)})};
+  $('#drop').onclick=function(){$('#foto').click()};
+  $('#foto').onchange=function(){var f=this.files[0];if(!f)return;var d=$('#drop');d.className='drop has';d.innerHTML='<img alt="Pratinjau foto" src="'+URL.createObjectURL(f)+'">';HK.toast('Foto dipilih.')};
+  $('#d1').onclick=function(){HK.confirm({title:'Hapus jadwal ini?',text:'Jadwal yang dihapus tidak dapat dikembalikan.',ok:'Ya, hapus',danger:true}).then(function(y){HK.toast(y?'Jadwal dihapus.':'Dibatalkan.')})};
+  $('#d2').onclick=function(){var d=HK.dialog('<h2 class="h2">Saya Tidak Masuk</h2><div class="field"><label for="x">Keterangan</label><textarea id="x" class="input"></textarea></div><div class="acts"><button class="btn sec" data-c>Batal</button><button class="btn" data-c>Kirim</button></div>');d.addEventListener('click',function(e){if(e.target.closest('[data-c]'))d.close()})};
+  $('#t1').onclick=function(){HK.toast('Jurnal berhasil disimpan.')};
+  $('#t2').onclick=function(){HK.toast('Foto gagal diunggah. Coba lagi.','bad')};
+});
+</script>
+</body>
+</html>
