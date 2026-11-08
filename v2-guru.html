@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>HADIRKU Guru</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%2317356B'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 13c5-2.6 10-2.4 15 .8 5-3.2 10-3.4 15-.8v22c-5-2.6-10-2.4-15 .8-5-3.2-10-3.4-15-.8z'/%3E%3Cpath d='M17.5 25.5l5 5 9-11'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="hadirku-v2.css">
+<style>
+.auth{max-width:420px;margin:0 auto;padding:max(24px,7vh) 16px;display:flex;flex-direction:column;gap:14px}
+.brand{display:flex;align-items:center;gap:12px}
+.feat{border-color:var(--navy);box-shadow:0 0 0 1px var(--navy)}
+.it{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.it:first-child{border-top:0}
+.dt{margin:20px 0 8px}
+</style>
+</head>
+<body>
+<div id="auth" class="auth" hidden></div>
+<div id="app" class="shell" hidden>
+  <nav class="nav" id="nav" aria-label="Menu utama">
+    <button data-tab="home" data-icon="calendar"><span>Hari ini</span></button>
+    <button data-tab="hist" data-icon="clock"><span>Riwayat</span></button>
+    <button data-tab="acct" data-icon="user"><span>Akun</span></button>
+  </nav>
+  <main class="main" id="view"></main>
+</div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="hadirku-v2.js"></script>
+<script>
+(function(){
+const TZ='Asia/Makassar',KAT=['Sakit','Izin Dinas','Izin Pribadi','Cuti'],SEL='*,kelas(nama_kelas),mapels(nama_mapel),journals(*)';
+const $=s=>document.querySelector(s),e=HK.esc,hm=HK.hm;
+let sb,uid,me={},tab='home',groups=[],win=15,sig='';
+const BD={belum_dicatat:['mut','Belum dicatat'],masuk:['ok','Masuk'],tidak_masuk:['warn','Tidak masuk'],terlewat:['bad','Terlewat'],dibatalkan:['mut','Dibatalkan']};
+const badge=s=>`<span class="badge ${BD[s][0]}">${BD[s][1]}</span>`;
+const LOGO=n=>`<svg width="${n}" height="${n}" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="var(--navy)"/><g fill="none" stroke="var(--on)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 13c5-2.6 10-2.4 15 .8 5-3.2 10-3.4 15-.8v22c-5-2.6-10-2.4-15 .8-5-3.2-10-3.4-15-.8z"/><path d="M17.5 25.5l5 5 9-11"/></g></svg>`;
+const secs=t=>{const p=String(t).split(':');return (+p[0])*3600+(+p[1])*60+(+p[2]||0)};
+const dateStr=()=>new Date().toLocaleDateString('en-CA',{timeZone:TZ});
+const hhmm=ms=>new Date(ms).toLocaleTimeString('en-GB',{timeZone:TZ,hour:'2-digit',minute:'2-digit'}).replace(':','.');
+const nowSecs=()=>{const w=new Date(new Date().toLocaleString('en-US',{timeZone:TZ}));return w.getHours()*3600+w.getMinutes()*60+w.getSeconds()};
+const jr=s=>Array.isArray(s.journals)?s.journals[0]:s.journals;
+const lockAt=j=>new Date(j.waktu_input).getTime()+36e5;
+const q=async p=>{const r=await p;if(r.error)throw r.error;return r.data};
+const show=id=>{$('#auth').hidden=id!=='auth';$('#app').hidden=id!=='app'};
+const bad=(el,msg)=>{const f=el.closest('.field');f.classList.add('invalid');f.querySelector('.err').textContent=msg;if(el.focus)el.focus()};
+const fld=(id,label,attrs,extra)=>`<div class="field"><label for="${id}">${label}</label><input id="${id}" class="input" ${attrs||''}><span class="err"></span>${extra||''}</div>`;
+function cfgGet(){if(window.HADIRKU_CFG&&HADIRKU_CFG.url&&HADIRKU_CFG.key)return window.HADIRKU_CFG;try{return JSON.parse(localStorage.getItem('hadirku_cfg')||'null')}catch(x){return null}}
+
+/* ---------- Masuk, daftar, koneksi ---------- */
+const head=t=>`<div class="brand">${LOGO(48)}<div><b class="h2">HADIRKU</b><p class="mut t-sm">${t}</p></div></div>`;
+function setup(){show('auth');$('#auth').innerHTML=head('Portal Guru')+`<h1 class="h1">Hubungkan database</h1><p class="mut">Isi sekali saja. Nilainya ada di Supabase: Project Settings, API Keys.</p>`+fld('u','Project URL','placeholder="https://xxxx.supabase.co" autocapitalize="none"')+fld('k','Publishable (anon) key','autocapitalize="none"')+`<button class="btn block" data-act="savecfg">Simpan dan lanjut</button>`}
+function authUI(mode,msg){show('auth');const reg=mode==='daftar';
+$('#auth').innerHTML=head('Portal Guru')+`<h1 class="h1">${reg?'Daftar akun guru':'Masuk'}</h1><p class="mut">${e(msg||(reg?'Akun aktif setelah disetujui admin sekolah.':'Catat kehadiran mengajar dan isi jurnal.'))}</p>`+
+(reg?fld('n','Nama lengkap dan gelar','autocomplete="name"'):'')+fld('em','Email','type="email" autocomplete="username" autocapitalize="none" inputmode="email"')+
+fld('pw','Kata sandi'+(reg?' (minimal 6 karakter)':''),`type="password" autocomplete="${reg?'new-password':'current-password'}"`)+
+`<button class="btn block" data-act="${reg?'signup':'login'}">${reg?'Daftar':'Masuk'}</button><button class="btn ghost block" data-act="${reg?'tologin':'toreg'}">${reg?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}</button>`+
+(window.HADIRKU_CFG?'':'<button class="btn ghost block" data-act="resetcfg">Ubah koneksi database</button>')}
+function pending(){show('auth');$('#auth').innerHTML=head('Portal Guru')+`<h1 class="h1">Menunggu persetujuan</h1>`+HK.alert('info','Akun Anda sudah terdaftar. Admin sekolah perlu menyetujuinya sebelum Anda bisa mencatat kehadiran.')+`<button class="btn block" data-act="recheck">Periksa lagi</button><button class="btn ghost block" data-act="logout2">Keluar</button>`}
+async function enter(){
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user)return authUI('masuk');
+  uid=user.id;
+  const {data:p}=await sb.from('profiles').select('nama,status_aktif').eq('id',uid).maybeSingle();
+  if(!p){await sb.auth.signOut();return authUI('masuk','Profil tidak ditemukan. Hubungi admin.')}
+  if(!p.status_aktif)return pending();
+  me={nama:p.nama,email:user.email};
+  const s=await sb.from('school_settings').select('attendance_window_minutes').eq('id',1).maybeSingle();
+  if(s.data)win=s.data.attendance_window_minutes;
+  show('app');render();
+}
+
+/* ---------- Beranda ---------- */
+async function loadHome(){
+  const d=dateStr(),get=()=>q(sb.from('daily_sessions').select(SEL).eq('guru_id',uid).eq('tanggal',d).order('jam_mulai'));
+  let rows=await get();
+  const iso=new Date(d+'T00:00:00').getDay()||7;
+  const sc=await q(sb.from('schedules').select('*').eq('guru_id',uid).eq('hari_id',iso));
+  const have=new Set(rows.map(s=>s.schedule_id)),miss=sc.filter(s=>!have.has(s.id));
+  if(miss.length){
+    const r=await sb.from('daily_sessions').upsert(miss.map(s=>({schedule_id:s.id,guru_id:uid,mapel_id:s.mapel_id,kelas_id:s.kelas_id,tanggal:d,jam_mulai:s.jam_mulai,jam_selesai:s.jam_selesai})),{onConflict:'schedule_id,tanggal',ignoreDuplicates:true});
+    if(r.error)HK.toast('Sesi dari jadwal gagal dibuat: '+r.error.message,'bad');
+    rows=await get();
+  }
+  const m={};rows.forEach(s=>{const k=s.jam_mulai+'|'+s.jam_selesai;(m[k]=m[k]||{mulai:s.jam_mulai,selesai:s.jam_selesai,items:[]}).items.push(s)});
+  groups=Object.values(m);
+}
+const pend=g=>g.items.filter(s=>s.status==='belum_dicatat');
+function phase(g){if(!pend(g).length)return 'done';const n=nowSecs(),st=secs(g.mulai);return n<st?'wait':n<=st+win*60?'open':'late'}
+const editable=g=>g.items.some(s=>{const j=jr(s);return j&&Date.now()<lockAt(j)});
+const gsig=()=>groups.map(g=>phase(g)+editable(g)).join();
+function card(g,i,feat){
+  const ph=phase(g),js=g.items.map(jr).filter(Boolean);let act='';
+  if(ph==='wait')act=`<p class="mut t-sm">Pencatatan dibuka pukul ${hm(g.mulai)}.</p>`;
+  if(ph==='open')act=`<div><p class="mut t-sm">Sisa waktu mencatat</p><p class="cd" data-cd="${secs(g.mulai)+win*60}">--:--</p></div><button class="btn block" data-act="masuk" data-g="${i}">${HK.icon('check')}Saya Masuk Kelas</button><button class="btn sec block" data-act="absen" data-g="${i}">Saya Tidak Masuk</button>`;
+  if(ph==='late'||(ph==='done'&&g.items.some(s=>s.status==='terlewat')))act=HK.alert('bad','Waktu pencatatan sudah lewat dan sesi terkunci. Hubungi admin bila perlu koreksi.');
+  if(js.some(j=>j.diterbitkan))act+=`<p class="t-sm"><span class="badge plain">Tugas ditampilkan ke murid</span></p>`;
+  if(js.length){const t=Math.min(...js.map(lockAt));act+=Date.now()<t?`<p class="mut t-sm">Jurnal dapat diubah sampai pukul ${hhmm(t)}.</p><button class="btn sec block" data-act="ubah" data-g="${i}">Ubah jurnal</button>`:'<p class="mut t-sm">Jurnal terkunci.</p>'}
+  return `<div class="card stack${feat?' feat':''}"><div class="row between"><b class="num">${hm(g.mulai)} sampai ${hm(g.selesai)}</b>${ph==='open'?'<span class="badge">Pencatatan dibuka</span>':ph==='wait'?'<span class="badge mut">Belum dibuka</span>':''}</div><div>${g.items.map(s=>`<div class="it"><div><span class="h3">${e(s.mapels.nama_mapel)}</span><br><span class="mut t-sm">${e(s.kelas.nama_kelas)}</span></div>${badge(s.status)}</div>`).join('')}</div>${act}</div>`;
+}
+function homeHTML(){
+  sig=gsig();
+  const hari=new Date().toLocaleDateString('id-ID',{timeZone:TZ,weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const f=groups.findIndex(g=>{const p=phase(g);return p==='open'||p==='wait'});
+  return `<p class="mut">${e(hari)}</p><h1 class="h1" style="margin-bottom:16px">Halo, ${e((me.nama||'').split(' ')[0])}</h1><div class="stack">${groups.map((g,i)=>card(g,i,i===f)).join('')||HK.empty('calendar','Tidak ada sesi mengajar hari ini. Jika seharusnya ada, hubungi admin untuk memeriksa jadwal Anda.')}</div>`;
+}
+function cd(){const n=nowSecs();document.querySelectorAll('[data-cd]').forEach(x=>{const r=Math.max(0,+x.dataset.cd-n);x.textContent=String(Math.floor(r/60)).padStart(2,'0')+':'+String(r%60).padStart(2,'0');x.classList.toggle('urgent',r<=180)})}
+setInterval(()=>{if($('#app').hidden||tab!=='home'||!groups.length)return;if(gsig()!==sig){$('#view').innerHTML=homeHTML()}cd()},1000);
+
+/* ---------- Riwayat dan akun ---------- */
+async function vHist(){
+  const d=await q(sb.from('daily_sessions').select(SEL).eq('guru_id',uid).order('tanggal',{ascending:false}).order('jam_mulai').limit(60));
+  if(!d.length)return `<h1 class="h1" style="margin-bottom:16px">Riwayat</h1>`+HK.empty('clock','Belum ada riwayat mengajar.');
+  let last='',h='<h1 class="h1">Riwayat</h1>';
+  d.forEach(s=>{
+    if(s.tanggal!==last){last=s.tanggal;h+=`<h2 class="h3 dt">${new Date(s.tanggal+'T00:00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</h2>`}
+    const j=jr(s);
+    h+=`<div class="card stack" style="margin-bottom:10px"><div class="row between"><b class="num">${hm(s.jam_mulai)} sampai ${hm(s.jam_selesai)}</b>${badge(s.status)}</div><div><span class="h3">${e(s.mapels.nama_mapel)}</span><br><span class="mut t-sm">${e(s.kelas.nama_kelas)}</span></div>`+
+    (j&&(j.alasan_kategori||j.tugas_teks)?`<div class="alert" style="flex-direction:column;gap:4px">${j.alasan_kategori?`<span class="t-sm"><b>Alasan:</b> ${e(j.alasan_kategori)}</span>`:''}${j.tugas_teks?`<span class="t-sm"><b>Tugas:</b> ${e(j.tugas_teks)}</span>`:''}${j.diterbitkan?'<span class="badge plain t-xs">Tampil ke murid</span>':''}</div>`:'')+`</div>`;
+  });
+  return h;
+}
+const acct=()=>`<h1 class="h1" style="margin-bottom:16px">Akun</h1><div class="card stack"><div class="row">${HK.icon('user')}<div class="grow"><b>${e(me.nama)}</b><p class="mut t-sm">${e(me.email)}</p></div></div><span class="badge ok" style="align-self:flex-start">Akun aktif</span></div><div class="stack" style="margin-top:16px"><button class="btn danger block" data-act="logout">${HK.icon('logout')}Keluar</button><p class="hint">Untuk mengubah nama atau kata sandi, hubungi admin sekolah.</p></div>`;
+
+async function render(){
+  document.querySelectorAll('#nav [data-tab]').forEach(b=>b.setAttribute('aria-current',b.dataset.tab===tab?'page':'false'));
+  const v=$('#view');
+  if(tab==='acct'){v.innerHTML=acct();return}
+  v.innerHTML=HK.skel(2);
+  try{if(tab==='home'){await loadHome();v.innerHTML=homeHTML();cd()}else v.innerHTML=await vHist()}
+  catch(x){v.innerHTML=HK.alert('bad','Data belum dapat dimuat. '+(x.message||''),'<button class="btn sm danger" data-act="retry">Coba lagi</button>')}
+}
+async function refresh(){await loadHome();if(tab==='home'){$('#view').innerHTML=homeHTML();cd()}}
+
+/* ---------- Formulir ---------- */
+const names=g=>`<p class="mut t-sm">${g.items.map(s=>e(s.kelas.nama_kelas)).join(', ')}</p>`;
+const chips=v=>`<div class="field" id="fk"><span class="lbl">Kategori alasan</span><div class="chips" id="ch">${KAT.map(k=>`<button type="button" class="chip" aria-pressed="${k===v}">${k}</button>`).join('')}</div><span class="err"></span></div>`;
+const pubSw=(on,foto)=>`<label class="switch"><input type="checkbox" id="pub"${on?' checked':''}><span>Tampilkan ${foto?'tugas dan foto ':''}ke murid</span></label><p class="hint" id="pv"></p>`;
+function wire(d,state){
+  const pv=()=>{const p=d.querySelector('#pv');if(p)p.textContent=d.querySelector('#pub').checked?'Murid akan melihat status guru, tugas'+(d.querySelector('#drop')?', dan foto':'')+'. Kategori alasan dan keterangan tidak tampil.':''};
+  d.querySelector('#pub').onchange=pv;pv();
+  d.querySelector('[data-close]').onclick=()=>d.close();
+  const ch=d.querySelector('#ch');
+  if(ch)ch.onclick=ev=>{const b=ev.target.closest('.chip');if(!b)return;state.kat=b.textContent;ch.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',c===b));d.querySelector('#fk').classList.remove('invalid')};
+  const dr=d.querySelector('#drop');
+  if(dr){const ft=d.querySelector('#ft');dr.onclick=()=>ft.click();
+    ft.onchange=async()=>{const f=ft.files[0];if(!f)return;try{state.blob=await shrink(f);dr.className='drop has';dr.innerHTML=`<img alt="Pratinjau foto tugas" src="${URL.createObjectURL(state.blob)}">`;HK.toast('Foto siap dikirim.')}catch(x){HK.toast(x.message,'bad')}}}
+}
+function shrink(file){return new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(file);
+im.onload=()=>{const s=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?ok(b):no(new Error('Foto gagal diproses.')),'image/jpeg',.8)};
+im.onerror=()=>no(new Error('File yang dipilih bukan gambar.'));im.src=u})}
+function formAbsen(g){
+  const st={kat:'',blob:null};
+  const d=HK.dialog(`<h2 class="h2">Saya Tidak Masuk</h2>${names(g)}<form class="stack" novalidate>${chips('')}
+<div class="field"><label for="al">Keterangan (opsional)</label><textarea id="al" class="input"></textarea><span class="hint">Hanya dilihat admin dan tidak tampil ke murid.</span></div>
+<div class="field"><label for="tg">Tugas untuk murid</label><textarea id="tg" class="input"></textarea></div>
+<div class="field"><span class="lbl">Foto tugas (maksimal 1)</span><button type="button" class="drop" id="drop">${HK.icon('camera')}<b>Ambil atau pilih foto</b><span class="t-xs">Ukuran diperkecil otomatis</span></button><input type="file" id="ft" accept="image/*" hidden></div>
+${pubSw(false,true)}<div class="acts"><button type="button" class="btn sec" data-close>Batal</button><button class="btn" id="sb">Kirim jurnal</button></div></form>`);
+  wire(d,st);
+  d.querySelector('form').onsubmit=async ev=>{ev.preventDefault();
+    if(!st.kat)return bad(d.querySelector('#ch'),'Pilih kategori alasan terlebih dahulu.');
+    const btn=d.querySelector('#sb');
+    try{await HK.busy(btn,async()=>{
+      const rows=[];
+      for(const s of pend(g)){let path=null;
+        if(st.blob){btn.textContent='Mengunggah foto…';path=uid+'/'+s.id+'.jpg';
+          const r=await sb.storage.from('tugas-foto').upload(path,st.blob,{contentType:'image/jpeg'});
+          if(r.error&&!/exist|duplicate/i.test(r.error.message))throw new Error('Foto gagal diunggah: '+r.error.message)}
+        rows.push({session_id:s.id,guru_id:uid,alasan_kategori:st.kat,alasan_teks:d.querySelector('#al').value.trim()||null,tugas_teks:d.querySelector('#tg').value.trim()||null,foto_url:path,diterbitkan:d.querySelector('#pub').checked})}
+      btn.textContent='Menyimpan…';await q(sb.from('journals').insert(rows))});
+      d.close();HK.toast('Jurnal tersimpan.');await refresh()}
+    catch(x){btn.textContent='Kirim jurnal';HK.toast(x.message,'bad')}};
+}
+function formUbah(g){
+  const js=g.items.map(jr).filter(Boolean),f=js[0],ab=f.alasan_kategori!=null,st={kat:f.alasan_kategori||''};
+  const d=HK.dialog(`<h2 class="h2">Ubah jurnal</h2>${names(g)}<form class="stack" novalidate>${ab?chips(st.kat)+`<div class="field"><label for="al">Keterangan</label><textarea id="al" class="input">${e(f.alasan_teks)}</textarea></div>`:''}
+<div class="field"><label for="tg">${ab?'Tugas untuk murid':'Catatan pembelajaran'}</label><textarea id="tg" class="input">${e(f.tugas_teks)}</textarea></div>
+${pubSw(f.diterbitkan,ab&&!!f.foto_url)}<div class="acts"><button type="button" class="btn sec" data-close>Batal</button><button class="btn" id="sb">Simpan perubahan</button></div></form>`);
+  wire(d,st);
+  d.querySelector('form').onsubmit=async ev=>{ev.preventDefault();
+    const up={tugas_teks:d.querySelector('#tg').value.trim()||null,diterbitkan:d.querySelector('#pub').checked};
+    if(ab){up.alasan_kategori=st.kat;up.alasan_teks=d.querySelector('#al').value.trim()||null}
+    try{await HK.busy(d.querySelector('#sb'),async()=>{
+      const r=await q(sb.from('journals').update(up).in('id',js.map(j=>j.id)).select());
+      if(!r.length)throw new Error('Batas 60 menit sudah lewat, jurnal terkunci.')});
+      d.close();HK.toast('Perubahan tersimpan.');await refresh()}
+    catch(x){HK.toast(x.message,'bad')}};
+}
+
+/* ---------- Aksi ---------- */
+async function act(b){
+  const a=b.dataset.act,g=groups[+b.dataset.g];
+  if(a==='savecfg'){const u=$('#u').value.trim(),k=$('#k').value.trim();
+    if(!/^https:\/\//.test(u))return bad($('#u'),'Alamat harus diawali https://');
+    if(k.length<20)return bad($('#k'),'Key belum lengkap.');
+    try{localStorage.setItem('hadirku_cfg',JSON.stringify({url:u,key:k}))}catch(x){}return boot()}
+  if(a==='resetcfg'){try{localStorage.removeItem('hadirku_cfg')}catch(x){}return setup()}
+  if(a==='toreg')return authUI('daftar');
+  if(a==='tologin')return authUI('masuk');
+  if(a==='login'){const em=$('#em'),pw=$('#pw');
+    if(!em.value.trim())return bad(em,'Email wajib diisi.');
+    if(!pw.value)return bad(pw,'Kata sandi wajib diisi.');
+    return HK.busy(b,async()=>{const r=await sb.auth.signInWithPassword({email:em.value.trim(),password:pw.value});if(r.error)bad(pw,'Email atau kata sandi salah.');else await enter()})}
+  if(a==='signup'){const n=$('#n'),em=$('#em'),pw=$('#pw');
+    if(!n.value.trim())return bad(n,'Nama lengkap wajib diisi.');
+    if(!em.value.trim())return bad(em,'Email wajib diisi.');
+    if(pw.value.length<6)return bad(pw,'Kata sandi minimal 6 karakter.');
+    return HK.busy(b,async()=>{const r=await sb.auth.signUp({email:em.value.trim(),password:pw.value,options:{data:{nama:n.value.trim()}}});
+      if(r.error)return bad(em,r.error.message);
+      if(r.data.session)await enter();else authUI('masuk','Pendaftaran berhasil. Periksa email Anda untuk konfirmasi, lalu masuk.')})}
+  if(a==='recheck')return HK.busy(b,enter);
+  if(a==='logout2'){await sb.auth.signOut();return authUI('masuk')}
+  if(a==='logout'){if(await HK.confirm({title:'Keluar dari HADIRKU?',text:'Anda perlu masuk lagi untuk mencatat kehadiran.',ok:'Keluar',danger:true})){await sb.auth.signOut();tab='home';authUI('masuk')}return}
+  if(a==='retry')return render();
+  if(a==='absen')return formAbsen(g);
+  if(a==='ubah')return formUbah(g);
+  if(a==='masuk')return HK.busy(b,async()=>{await q(sb.from('journals').insert(pend(g).map(s=>({session_id:s.id,guru_id:uid}))));HK.toast('Kehadiran tercatat.');await refresh()});
+}
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest('[data-tab]');if(t&&!$('#app').hidden){tab=t.dataset.tab;return render()}
+  const b=ev.target.closest('#auth [data-act],#view [data-act]');if(b)act(b).catch(x=>HK.toast(x.message||'Terjadi kesalahan.','bad'));
+});
+document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.id==='pw'){const b=document.querySelector('#auth [data-act=login],#auth [data-act=signup]');if(b)act(b).catch(x=>HK.toast(x.message,'bad'))}});
+function boot(){const c=cfgGet();if(!c)return setup();sb=supabase.createClient(c.url,c.key);enter().catch(x=>HK.toast(x.message||'Gagal terhubung.','bad'))}
+HK.ready(boot);
+})();
+</script>
+</body>
+</html>
