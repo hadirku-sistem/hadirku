@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HADIRKU Murid</title>
+<style>
+:root{--bg:#f2f5f6;--card:#fff;--ink:#14212a;--mut:#5f6f79;--line:#d9e1e5;--pri:#0b5c6b;--on:#fff;--soft:#dcedf0;--bad:#b3261e;--ok:#1b7a46;--warn:#946200}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1519;--card:#162027;--ink:#e6eef2;--mut:#93a4ad;--line:#26343d;--pri:#4fb4c6;--on:#06232a;--soft:#183840;--bad:#f2837b;--ok:#5cc88a;--warn:#e2b44f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:560px;margin:0 auto;padding:0 14px calc(40px + env(safe-area-inset-bottom,0))}
+header{padding:16px 0 6px}header b{font-size:20px;letter-spacing:.2px}header small{display:block;color:var(--mut);font-size:13px}
+.who{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;background:var(--soft);border-radius:10px;padding:10px 12px;margin:8px 0 10px;font-size:14px}
+.who button{flex:none;padding:6px 12px}
+nav{display:flex;gap:6px;margin-bottom:10px}
+nav button{flex:1;background:transparent;color:var(--mut);border:1px solid var(--line)}
+nav button.on{background:var(--pri);color:var(--on);border-color:var(--pri)}
+button{font:inherit;font-weight:600;background:var(--pri);color:var(--on);border:1px solid var(--pri);border-radius:8px;padding:10px 14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--pri)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+input,select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%}
+input[type=checkbox]{width:auto;accent-color:var(--pri)}
+label{display:block;font-size:13px;color:var(--mut);margin:14px 0 4px}
+label.chk{display:flex;gap:10px;align-items:center;color:var(--ink);font-size:15px;margin:0;padding:9px 0;border-bottom:1px solid var(--line)}
+h2{font-size:15px;margin:18px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.jam{font-weight:700;font-variant-numeric:tabular-nums}.mut{color:var(--mut);font-size:13.5px}
+.tag{font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;border:1px solid currentColor;white-space:nowrap;color:var(--mut)}
+.tag.ok{color:var(--ok)}.tag.warn{color:var(--warn)}
+.jenis{display:inline-block;font-size:12px;color:var(--pri);border:1px solid var(--line);border-radius:6px;padding:0 6px;margin-left:6px}
+.tugas{margin-top:10px;padding:10px;border-radius:8px;background:var(--soft);white-space:pre-wrap;word-break:break-word}
+.tugas b{display:block;font-size:13px;margin-bottom:2px}
+.tugas button{margin-top:8px;padding:7px 12px}
+.empty{color:var(--mut);padding:14px 0}
+.foot{color:var(--mut);font-size:12.5px;margin-top:22px}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:10;padding:14px}
+#ov .ovb{max-width:560px;width:100%;text-align:center}#ov img{max-width:100%;max-height:78vh;border-radius:8px}#ov button{margin-top:12px}
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0));transform:translateX(-50%);background:var(--bad);color:#fff;padding:10px 16px;border-radius:8px;max-width:90%;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+#toast.show{opacity:1}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><b>HADIRKU</b><small id="sch">Jadwal dan tugas kelas</small></header>
+  <div id="view"><p class="empty">Memuat…</p></div>
+</div>
+<div id="ov" hidden></div>
+<div id="toast" role="status"></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const TZ='Asia/Makassar',KEY='hadirku_murid2',HARI=['','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+let sb,kelas=[],pemList=[],S={reg:'',pem:[]},tab='hari',tgl='';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hm=t=>String(t).slice(0,5);
+const dstr=n=>new Date(Date.now()-n*864e5).toLocaleDateString('en-CA',{timeZone:TZ});
+const nm=id=>(kelas.find(k=>k.id===id)||{}).nama_kelas||'';
+const pn=id=>(pemList.find(m=>m.id===id)||{}).nama_mapel||'';
+const lbl=x=>x.jenis==='peminatan'?'Peminatan, ruang '+esc(x.nama_kelas):'Reguler';
+function toast(m){const t=$('#toast');t.textContent=m;t.className='show';clearTimeout(toast.t);toast.t=setTimeout(()=>t.className='',3600)}
+async function q(p){const r=await p;if(r.error)throw r.error;return r.data}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+/* ---------- Pilih kelas dan mapel peminatan ---------- */
+async function loadPem(){
+  pemList=[];if(!S.reg)return;
+  try{pemList=await q(sb.rpc('portal_mapel_peminatan',{p_reguler:S.reg}))}catch(e){toast('Daftar mapel peminatan belum dapat dimuat.')}
+  S.pem=S.pem.filter(id=>pemList.some(m=>m.id===id));
+}
+function pick(){
+  $('#view').innerHTML=`<h2>Pilih kelas Anda</h2><label>Kelas reguler</label>
+  <select id="reg"><option value="">Pilih kelas</option>${kelas.map(k=>`<option value="${k.id}"${k.id===S.reg?' selected':''}>${esc(k.nama_kelas)}</option>`).join('')}</select>
+  <div id="pem"></div>
+  <button data-act="simpan" style="width:100%;margin-top:18px">Lihat jadwal</button>
+  <p class="foot">Pilihan kelas hanya untuk menampilkan jadwal dan bukan tanda pengenal.</p>`;
+  $('#pem').innerHTML=S.reg?'<p class="mut">Memuat mapel peminatan…</p>':'';
+  loadPem().then(drawPem);
+}
+function drawPem(){
+  $('#pem').innerHTML=!S.reg?'':pemList.length
+    ?`<label>Mapel peminatan Anda (maksimal 4)</label>`+pemList.map(m=>`<label class="chk"><input type="checkbox" value="${m.id}"${S.pem.includes(m.id)?' checked':''}><span>${esc(m.nama_mapel)}<br><span class="mut">${esc(m.nama_guru)}</span></span></label>`).join('')
+    :'<p class="mut">Belum ada mapel peminatan untuk tingkat ini.</p>';
+}
+
+/* ---------- Jadwal ---------- */
+const stClass=s=>s==='Guru hadir'?'ok':s==='Guru berhalangan hadir'?'warn':'';
+function home(){
+  const names=S.pem.map(pn).filter(Boolean);
+  $('#view').innerHTML=`<div class="who"><div><b>${esc(nm(S.reg))}</b><br><span class="mut">${names.length?esc(names.join(', ')):'Tanpa mapel peminatan'}</span></div><button class="ghost" data-act="ganti">Ganti kelas</button></div>
+  <nav><button data-tab="hari" class="${tab==='hari'?'on':''}">Per hari</button><button data-tab="minggu" class="${tab==='minggu'?'on':''}">Mingguan</button></nav>
+  <div id="isi"><p class="empty">Memuat…</p></div>
+  <p class="foot">Informasi berasal dari jurnal guru dan dapat berubah sewaktu-waktu.</p>`;
+  (tab==='hari'?hari:minggu)().catch(()=>{$('#isi').innerHTML='<p class="empty">Data belum dapat dimuat. Coba lagi nanti.</p>'});
+}
+async function hari(){
+  const d=await q(sb.rpc('portal_jadwal',{p_reguler:S.reg,p_peminatan:S.pem,p_tanggal:tgl}));
+  $('#isi').innerHTML=`<label style="margin-top:0">Tanggal</label><input type="date" id="tgl" value="${tgl}" min="${dstr(7)}" max="${dstr(0)}">
+  <div style="margin-top:12px">${d.map(x=>`<div class="card"><div class="row"><div><span class="jam">${hm(x.jam_mulai)} sampai ${hm(x.jam_selesai)}</span><br><b>${esc(x.nama_mapel)}</b><br><span class="mut">${esc(x.nama_guru)}<span class="jenis">${lbl(x)}</span></span></div><span class="tag ${stClass(x.status_netral)}">${esc(x.status_netral)}</span></div>
+  ${x.catatan||x.foto_path?`<div class="tugas"><b>Tugas dari guru</b>${esc(x.catatan||'')}${x.foto_path?`<br><button class="ghost" data-act="foto" data-p="${esc(x.foto_path)}">Lihat foto tugas</button>`:''}</div>`:''}</div>`).join('')||'<p class="empty">Tidak ada pelajaran pada tanggal ini.</p>'}</div>`;
+}
+async function minggu(){
+  const d=await q(sb.rpc('portal_jadwal_mingguan',{p_reguler:S.reg,p_peminatan:S.pem}));
+  let h='',last=0;
+  d.forEach(x=>{if(x.hari_id!==last){last=x.hari_id;h+=`<h2>${HARI[x.hari_id]}</h2>`}
+    h+=`<div class="card"><div class="row"><div><span class="jam">${hm(x.jam_mulai)} sampai ${hm(x.jam_selesai)}</span><br><b>${esc(x.nama_mapel)}</b><br><span class="mut">${esc(x.nama_guru)}<span class="jenis">${lbl(x)}</span></span></div></div></div>`});
+  $('#isi').innerHTML=h||'<p class="empty">Jadwal mingguan belum tersedia.</p>';
+}
+
+/* ---------- Aksi ---------- */
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('[data-tab]');if(t){tab=t.dataset.tab;return home()}
+  const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+  if(a==='ganti')return pick();
+  if(a==='simpan'){const reg=$('#reg').value;if(!reg)return toast('Pilih kelas reguler terlebih dahulu.');
+    S={reg,pem:[...document.querySelectorAll('#pem input:checked')].map(i=>i.value)};save();tgl=dstr(0);return home()}
+  if(a==='tutup'){$('#ov').hidden=true;$('#ov').innerHTML='';return}
+  if(a==='foto'){
+    const {data,error}=await sb.storage.from('tugas-foto').createSignedUrl(b.dataset.p,900);
+    if(error||!data)return toast('Foto tugas tidak dapat dibuka.');
+    $('#ov').innerHTML=`<div class="ovb"><img src="${esc(data.signedUrl)}" alt="Foto tugas"><br><button data-act="tutup">Tutup</button></div>`;$('#ov').hidden=false}
+});
+document.addEventListener('change',e=>{
+  if(e.target.id==='reg'){S={reg:e.target.value,pem:[]};$('#pem').innerHTML=S.reg?'<p class="mut">Memuat mapel peminatan…</p>':'';return loadPem().then(drawPem)}
+  if(e.target.id==='tgl'&&e.target.value){tgl=e.target.value;return hari().catch(()=>{})}
+  if(e.target.matches('#pem input')&&document.querySelectorAll('#pem input:checked').length>4){e.target.checked=false;toast('Maksimal 4 mapel peminatan.')}
+});
+
+async function boot(){
+  const c=window.HADIRKU_CFG;
+  if(!c||!c.url||!c.key){$('#view').innerHTML='<p class="empty">Portal belum dikonfigurasi. Hubungi admin sekolah.</p>';return}
+  sb=supabase.createClient(c.url,c.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+  try{
+    kelas=(await q(sb.rpc('portal_kelas'))).filter(k=>k.jenis==='reguler');
+    const n=await sb.rpc('portal_nama_sekolah');if(n.data)$('#sch').textContent=n.data;
+  }catch(e){$('#view').innerHTML='<p class="empty">Data belum dapat dimuat. Coba lagi nanti.</p>';return}
+  try{const s=JSON.parse(localStorage.getItem(KEY)||'null');
+    if(s&&kelas.some(k=>k.id===s.reg)&&Array.isArray(s.pem)){S={reg:s.reg,pem:s.pem};await loadPem();tgl=dstr(0);return home()}}catch(e){}
+  pick();
+}
+boot();
+</script>
+</body>
+</html>
