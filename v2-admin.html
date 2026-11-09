@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>HADIRKU Admin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%2317356B'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 13c5-2.6 10-2.4 15 .8 5-3.2 10-3.4 15-.8v22c-5-2.6-10-2.4-15 .8-5-3.2-10-3.4-15-.8z'/%3E%3Cpath d='M17.5 25.5l5 5 9-11'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="hadirku-v2.css">
+<style>
+.auth{max-width:420px;margin:0 auto;padding:max(24px,7vh) 16px;display:flex;flex-direction:column;gap:14px}
+.brand{display:flex;align-items:center;gap:12px}
+.nav .x,.nav .out,.nav .logo{display:none}
+@media(min-width:1024px){.nav .x{display:flex}.nav .more{display:none}.nav .out{display:flex;margin-top:auto}.nav .logo{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}}
+.g4{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:16px}
+@media(min-width:640px){.g4{grid-template-columns:repeat(4,1fr)}}
+.stat{font-size:2rem;font-weight:700;line-height:1.2}.stat.ok{color:var(--ok)}.stat.warn{color:var(--warn)}.stat.bad{color:var(--bad)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 12px;align-items:center}
+.sec{margin:22px 0 8px}
+.foto{display:block;max-width:100%;max-height:300px;margin:0 auto;border-radius:var(--r);object-fit:contain;background:var(--soft)}
+dl.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}dl.kv dt{color:var(--mut);font-size:.875rem}dl.kv dd{margin:0;word-break:break-word}
+</style>
+</head>
+<body>
+<div id="auth" class="auth" hidden></div>
+<div id="app" class="shell" hidden>
+  <nav class="nav" id="nav" aria-label="Menu utama"></nav>
+  <main class="main" id="view"></main>
+</div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="hadirku-v2.js"></script>
+<script>
+(function(){
+const TZ='Asia/Makassar',HARI=['','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+const $=s=>document.querySelector(s),e=HK.esc,hm=HK.hm;
+let sb,tab='dash',C={},me={};
+const S={rekap:{p:'week',by:'guru'},jurnal:{date:'',q:''},jadwal:{q:'',hari:''},guru:{f:'off',q:''},master:{t:'kelas',f:'all',q:''}};
+const SELS='*,profiles(nama),kelas(nama_kelas),mapels(nama_mapel),journals(*)';
+const BD={belum_dicatat:['mut','Belum dicatat'],masuk:['ok','Hadir'],tidak_masuk:['warn','Tidak masuk'],terlewat:['bad','Terlewat'],dibatalkan:['mut','Dibatalkan']};
+const badge=s=>`<span class="badge ${BD[s][0]}">${BD[s][1]}</span>`;
+const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:TZ});
+const shift=(s,n)=>{const x=new Date(s+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const fdate=s=>new Date(s+'T00:00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+const hhmm=ms=>new Date(ms).toLocaleTimeString('en-GB',{timeZone:TZ,hour:'2-digit',minute:'2-digit'}).replace(':','.');
+const q=async p=>{const r=await p;if(r.error)throw r.error;return r.data};
+const all=async mk=>{let o=[],f=0;for(;;){const d=await q(mk().range(f,f+999));o=o.concat(d);if(d.length<1000)return o;f+=1000}};
+const jr=s=>Array.isArray(s.journals)?s.journals[0]:s.journals;
+const norm=s=>String(s||'').toLowerCase();
+const show=id=>{$('#auth').hidden=id!=='auth';$('#app').hidden=id!=='app'};
+const bad=(el,msg)=>{const f=el.closest('.field');f.classList.add('invalid');f.querySelector('.err').textContent=msg;if(el.focus)el.focus()};
+const fld=(id,label,attrs)=>`<div class="field"><label for="${id}">${label}</label><input id="${id}" class="input" ${attrs||''}><span class="err"></span></div>`;
+const H=(t,sub)=>`<h1 class="h1">${t}</h1>${sub?`<p class="mut" style="margin-top:4px">${sub}</p>`:''}`;
+const srch=(k,v,ph)=>`<div class="search">${HK.icon('search')}<input class="input" data-s="${k}" value="${e(v)}" placeholder="${ph}" aria-label="${ph}"></div>`;
+const chipset=(k,cur,o)=>`<div class="chips" data-c="${k}">${o.map(([v,l])=>`<button type="button" class="chip" data-v="${v}" aria-pressed="${v===cur}">${l}</button>`).join('')}</div>`;
+const table=(cols,rows)=>`<table class="tbl"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td data-label="${cols[i]}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+const LOGO=n=>`<svg width="${n}" height="${n}" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="var(--navy)"/><g fill="none" stroke="var(--on)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 13c5-2.6 10-2.4 15 .8 5-3.2 10-3.4 15-.8v22c-5-2.6-10-2.4-15 .8-5-3.2-10-3.4-15-.8z"/><path d="M17.5 25.5l5 5 9-11"/></g></svg>`;
+function cfgGet(){if(window.HADIRKU_CFG&&HADIRKU_CFG.url&&HADIRKU_CFG.key)return window.HADIRKU_CFG;try{return JSON.parse(localStorage.getItem('hadirku_cfg')||'null')}catch(x){return null}}
+
+/* ---------- Masuk dan navigasi ---------- */
+const head=`<div class="brand">${LOGO(48)}<div><b class="h2">HADIRKU</b><p class="mut t-sm">Portal Admin</p></div></div>`;
+function setup(){show('auth');$('#auth').innerHTML=head+`<h1 class="h1">Hubungkan database</h1><p class="mut">Isi sekali saja. Nilainya ada di Supabase: Project Settings, API Keys.</p>`+fld('u','Project URL','placeholder="https://xxxx.supabase.co" autocapitalize="none"')+fld('k','Publishable (anon) key','autocapitalize="none"')+`<button class="btn block" data-act="savecfg">Simpan dan lanjut</button>`}
+function loginUI(msg){show('auth');$('#auth').innerHTML=head+`<h1 class="h1">Masuk</h1><p class="mut">${e(msg||'Masuk dengan akun admin sekolah.')}</p>`+fld('em','Email','type="email" autocomplete="username" autocapitalize="none" inputmode="email"')+fld('pw','Kata sandi','type="password" autocomplete="current-password"')+`<button class="btn block" data-act="login">Masuk</button>`+(window.HADIRKU_CFG?'':'<button class="btn ghost block" data-act="resetcfg">Ubah koneksi database</button>')}
+const TABS=[['dash','Beranda','home'],['jadwal','Jadwal','calendar'],['jurnal','Jurnal','list'],['rekap','Rekap','chart'],['guru','Guru','users',1],['master','Kelas dan Mapel','book',1],['set','Pengaturan','sliders',1]];
+function navHTML(){return `<div class="logo">${LOGO(36)}<b class="h3">HADIRKU Admin</b></div>`+TABS.map(t=>`<button data-tab="${t[0]}" class="${t[3]?'x':''}">${HK.icon(t[2])}<span>${t[1]}</span></button>`).join('')+`<button class="more" data-act="more">${HK.icon('plus')}<span>Lainnya</span></button><button class="out" data-act="logout">${HK.icon('logout')}<span>Keluar</span></button>`}
+async function enter(){
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user)return loginUI();
+  const {data:p}=await sb.from('profiles').select('nama,role,status_aktif').eq('id',user.id).maybeSingle();
+  if(!p||p.role!=='admin'||!p.status_aktif){await sb.auth.signOut();return loginUI('Akun ini bukan admin aktif.')}
+  me={nama:p.nama};$('#nav').innerHTML=navHTML();show('app');render();
+}
+async function render(){
+  const ex=['guru','master','set'].includes(tab);
+  document.querySelectorAll('#nav [data-tab]').forEach(b=>b.setAttribute('aria-current',b.dataset.tab===tab?'page':'false'));
+  document.querySelector('#nav .more').setAttribute('aria-current',ex?'page':'false');
+  const v=$('#view');v.innerHTML=HK.skel(2);window.scrollTo(0,0);
+  try{v.innerHTML=await V[tab]();if(P[tab])P[tab]()}
+  catch(x){v.innerHTML=HK.alert('bad','Data belum dapat dimuat. '+(x.message||''),'<button class="btn sm danger" data-act="retry">Coba lagi</button>')}
+}
+
+/* ---------- Beranda ---------- */
+async function dash(){
+  const d=today();
+  const [rows,pg]=await Promise.all([q(sb.from('daily_sessions').select(SELS).eq('tanggal',d).order('jam_mulai')),q(sb.from('profiles').select('id').eq('role','guru').eq('status_aktif',false))]);
+  const c={};rows.forEach(s=>c[s.status]=(c[s.status]||0)+1);
+  const st=(k,l,cl)=>`<div class="card"><p class="mut t-sm">${l}</p><p class="stat ${cl}">${c[k]||0}</p></div>`;
+  const miss=rows.filter(s=>s.status==='terlewat');
+  return H('Beranda',fdate(d))+(pg.length?`<div style="margin-top:16px">${HK.alert('warn',pg.length+' guru menunggu persetujuan.','<button class="btn sm sec" data-go="guru">Tinjau sekarang</button>')}</div>`:'')+
+  `<div class="g4">${st('masuk','Hadir','ok')}${st('tidak_masuk','Tidak masuk','warn')}${st('terlewat','Terlewat','bad')}${st('belum_dicatat','Belum dicatat','')}</div>
+  <div class="tools"><button class="btn" data-act="gen">${HK.icon('refresh')}Buat sesi hari ini</button><button class="btn sec" data-act="missed">Tandai sesi terlewat</button></div>
+  <h2 class="h2 sec">Perlu perhatian</h2>`+(miss.length?table(['Jam','Guru','Kelas dan mapel','Status'],miss.map(s=>[`<span class="num">${hm(s.jam_mulai)}</span>`,e(s.profiles&&s.profiles.nama),e(s.kelas.nama_kelas+', '+s.mapels.nama_mapel),badge(s.status)])):HK.empty('check','Tidak ada sesi terlewat hari ini.'));
+}
+
+/* ---------- Rekap ---------- */
+async function rekap(){
+  const R=S.rekap,t=today(),from=R.p==='day'?t:R.p==='week'?shift(t,-6):t.slice(0,8)+'01';
+  const rows=await all(()=>sb.from('daily_sessions').select('status,guru_id,kelas_id,profiles(nama),kelas(nama_kelas)').gte('tanggal',from).lte('tanggal',t).order('id'));
+  const m={};rows.forEach(s=>{const k=R.by==='guru'?(s.profiles?s.profiles.nama:'-'):(s.kelas?s.kelas.nama_kelas:'-');const o=m[k]=m[k]||{masuk:0,tidak_masuk:0,terlewat:0,belum_dicatat:0,dibatalkan:0,n:0};o[s.status]++;o.n++});
+  const names=Object.keys(m).sort((a,b)=>a.localeCompare(b,'id',{numeric:true}));
+  const pct=o=>{const d=o.masuk+o.tidak_masuk+o.terlewat;return d?Math.round(100*o.masuk/d)+'%':'-'};
+  const cols=[R.by==='guru'?'Guru':'Kelas','Hadir','Tidak masuk','Terlewat','Belum dicatat','Total','Persen hadir'];
+  C.csv=[cols].concat(names.map(n=>{const o=m[n];return [n,o.masuk,o.tidak_masuk,o.terlewat,o.belum_dicatat,o.n,pct(o)]}));
+  return H('Rekap kehadiran',`${fdate(from)} sampai ${fdate(t)}`)+`<div class="tools">${chipset('rekap.p',R.p,[['day','Hari ini'],['week','7 hari'],['month','Bulan ini']])}${chipset('rekap.by',R.by,[['guru','Per guru'],['kelas','Per kelas']])}<button class="btn sec sm" data-act="csv">Unduh CSV</button></div>`+
+  (names.length?table(cols,C.csv.slice(1).map(r=>[e(r[0]),`<span class="badge ok plain">${r[1]}</span>`,r[2],r[3],r[4],r[5],`<b>${r[6]}</b>`])):HK.empty('chart','Belum ada sesi pada periode ini.'))+
+  `<p class="hint" style="margin-top:12px">Persen hadir dihitung dari sesi yang sudah dicatat atau terlewat. Sesi belum dicatat dan dibatalkan tidak ikut dihitung.</p>`;
+}
+function csv(rows){const cell=c=>{c=String(c);if(/^[=+\-@\t\r]/.test(c))c="'"+c;return '"'+c.replace(/"/g,'""')+'"'};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download='rekap-hadirku-'+today()+'.csv';document.body.appendChild(a);a.click();a.remove()}
+
+/* ---------- Jurnal ---------- */
+async function jurnal(){
+  const J=S.jurnal;if(!J.date)J.date=today();
+  C.jr=await q(sb.from('daily_sessions').select(SELS).eq('tanggal',J.date).order('jam_mulai'));
+  return H('Jurnal guru','Pantau kehadiran dan isi jurnal per tanggal.')+`<div class="tools"><input type="date" class="input" style="width:auto" data-d="jurnal" value="${J.date}" aria-label="Tanggal">${srch('jurnal',J.q,'Cari guru, kelas, atau mapel')}</div><div id="lst"></div>`;
+}
+function paintJurnal(){
+  const f=C.jr.filter(s=>norm((s.profiles?s.profiles.nama:'')+' '+s.kelas.nama_kelas+' '+s.mapels.nama_mapel).includes(norm(S.jurnal.q)));
+  $('#lst').innerHTML=f.length?table(['Jam','Guru','Kelas dan mapel','Status',''],f.map(s=>[`<span class="num">${hm(s.jam_mulai)}</span>`,e(s.profiles&&s.profiles.nama),e(s.kelas.nama_kelas+', '+s.mapels.nama_mapel),badge(s.status)+(jr(s)&&jr(s).diterbitkan?' <span class="badge plain">Terbit</span>':''),`<button class="btn sm sec" data-act="detail" data-id="${s.id}">Detail</button>`])):HK.empty('list','Tidak ada sesi yang cocok pada tanggal ini.');
+}
+async function detail(id){
+  const s=C.jr.find(x=>x.id===id),j=jr(s);let foto='';
+  const d=HK.dialog(`<h2 class="h2">Detail sesi</h2><dl class="kv"><dt>Guru</dt><dd>${e(s.profiles&&s.profiles.nama)}</dd><dt>Kelas</dt><dd>${e(s.kelas.nama_kelas)}</dd><dt>Mapel</dt><dd>${e(s.mapels.nama_mapel)}</dd><dt>Jam</dt><dd>${hm(s.jam_mulai)} sampai ${hm(s.jam_selesai)}</dd><dt>Status</dt><dd>${badge(s.status)}</dd>
+  ${j?`<dt>Dicatat</dt><dd>${hhmm(j.waktu_input)}</dd>${j.alasan_kategori?`<dt>Alasan</dt><dd>${e(j.alasan_kategori)}</dd><dt>Keterangan</dt><dd>${e(j.alasan_teks||'-')}</dd>`:''}<dt>Tugas</dt><dd>${e(j.tugas_teks||'-')}</dd><dt>Murid</dt><dd>${j.diterbitkan?'<span class="badge ok">Tampil ke murid</span>':'<span class="badge mut">Tidak tampil</span>'}</dd>`:''}</dl>
+  ${j&&j.foto_url?'<div id="ft" class="skel" style="height:120px"></div>':''}${j?'':'<p class="mut t-sm">Belum ada jurnal untuk sesi ini.</p>'}
+  <div class="acts">${['belum_dicatat','terlewat'].includes(s.status)?`<button class="btn danger" data-x="cancel">Batalkan sesi</button>`:''}<button class="btn sec" data-x="close">Tutup</button></div>`);
+  d.addEventListener('click',async ev=>{const x=ev.target.closest('[data-x]');if(!x)return;
+    if(x.dataset.x==='close')return d.close();
+    if(await HK.confirm({title:'Batalkan sesi ini?',text:'Sesi akan ditandai dibatalkan dan tidak bisa dicatat guru.',ok:'Ya, batalkan',danger:true})){
+      try{await q(sb.from('daily_sessions').update({status:'dibatalkan'}).eq('id',id));d.close();HK.toast('Sesi dibatalkan.');render()}catch(er){HK.toast(er.message,'bad')}}});
+  if(j&&j.foto_url){const r=await sb.storage.from('tugas-foto').createSignedUrl(j.foto_url,900),b=d.querySelector('#ft');
+    if(b){if(r.error||!r.data){b.outerHTML='<p class="mut t-sm">Foto tidak dapat dibuka.</p>'}else b.outerHTML=`<img class="foto" alt="Foto tugas" src="${e(r.data.signedUrl)}">`}}
+}
+
+/* ---------- Jadwal ---------- */
+async function jadwal(){
+  C.sc=await q(sb.from('schedules').select('*,profiles(nama),kelas(nama_kelas),mapels(nama_mapel,peminatan)').order('hari_id').order('jam_mulai'));
+  const J=S.jadwal;
+  return H('Jadwal mengajar',C.sc.length+' jadwal mingguan')+`<div class="tools">${srch('jadwal',J.q,'Cari guru, kelas, atau mapel')}<select class="input" style="width:auto" data-h="1" aria-label="Hari"><option value="">Semua hari</option>${HARI.slice(1).map((h,i)=>`<option value="${i+1}"${J.hari==i+1?' selected':''}>${h}</option>`).join('')}</select><button class="btn" data-act="addj">${HK.icon('plus')}Tambah jadwal</button></div><div id="lst"></div>`;
+}
+function paintJadwal(){
+  const J=S.jadwal,f=C.sc.filter(s=>(!J.hari||s.hari_id==J.hari)&&norm((s.profiles?s.profiles.nama:'')+' '+s.kelas.nama_kelas+' '+s.mapels.nama_mapel).includes(norm(J.q)));
+  $('#lst').innerHTML=f.length?table(['Hari','Jam','Guru','Mapel','Kelas',''],f.map(s=>[HARI[s.hari_id],`<span class="num">${hm(s.jam_mulai)} sampai ${hm(s.jam_selesai)}</span>`,e(s.profiles&&s.profiles.nama),e(s.mapels.nama_mapel)+(s.mapels.peminatan?' <span class="badge plain">Peminatan</span>':''),e(s.kelas.nama_kelas),`<button class="btn sm danger" data-act="del" data-tb="schedules" data-id="${s.id}" data-n="jadwal ${e(s.mapels.nama_mapel)} ${e(s.kelas.nama_kelas)}">Hapus</button>`])):HK.empty('calendar','Tidak ada jadwal yang cocok.');
+}
+async function formJadwal(){
+  const [g,k,m]=await Promise.all([q(sb.from('profiles').select('id,nama').eq('role','guru').eq('status_aktif',true).order('nama')),q(sb.from('kelas').select('id,nama_kelas').order('nama_kelas')),q(sb.from('mapels').select('id,nama_mapel').order('nama_mapel'))]);
+  if(!g.length||!k.length||!m.length)return HK.toast('Isi dulu guru aktif, kelas, dan mata pelajaran.','bad');
+  const o=(a,v,t)=>a.map(x=>`<option value="${x[v]}">${e(x[t])}</option>`).join('');
+  const d=HK.dialog(`<h2 class="h2">Tambah jadwal</h2><form class="stack" novalidate>
+  <div class="field"><label for="jg">Guru</label><select id="jg" class="input">${o(g,'id','nama')}</select></div>
+  <div class="field"><label for="jk">Kelas (ruang)</label><select id="jk" class="input">${o(k,'id','nama_kelas')}</select></div>
+  <div class="field"><label for="jm">Mata pelajaran</label><select id="jm" class="input">${o(m,'id','nama_mapel')}</select></div>
+  <div class="field"><label for="jh">Hari</label><select id="jh" class="input">${HARI.slice(1).map((h,i)=>`<option value="${i+1}">${h}</option>`).join('')}</select></div>
+  <div class="row"><div class="field grow"><label for="j1">Mulai</label><input id="j1" type="time" class="input" value="07:00"><span class="err"></span></div><div class="field grow"><label for="j2">Selesai</label><input id="j2" type="time" class="input" value="07:45"><span class="err"></span></div></div>
+  <p class="hint">Satu guru mengajar dua kelas di jam yang sama? Simpan dua jadwal, satu per kelas. Untuk mapel peminatan, pilih ruang kelas tempat pelajaran berlangsung.</p>
+  <div class="acts"><button type="button" class="btn sec" data-x="close">Batal</button><button class="btn" id="sb">Simpan jadwal</button></div></form>`);
+  d.querySelector('[data-x]').onclick=()=>d.close();
+  d.querySelector('form').onsubmit=async ev=>{ev.preventDefault();
+    const v=id=>d.querySelector('#'+id).value;
+    if(!v('j1'))return bad(d.querySelector('#j1'),'Jam mulai wajib diisi.');
+    if(!v('j2')||v('j2')<=v('j1'))return bad(d.querySelector('#j2'),'Jam selesai harus setelah jam mulai.');
+    try{await HK.busy(d.querySelector('#sb'),()=>q(sb.from('schedules').insert({guru_id:v('jg'),kelas_id:v('jk'),mapel_id:v('jm'),hari_id:+v('jh'),jam_mulai:v('j1'),jam_selesai:v('j2')})));d.close();HK.toast('Jadwal tersimpan.');render()}catch(er){HK.toast(er.message,'bad')}};
+}
+
+/* ---------- Guru ---------- */
+async function guru(){
+  C.gr=await q(sb.from('profiles').select('*').eq('role','guru').order('nama'));
+  const G=S.guru,off=C.gr.filter(x=>!x.status_aktif).length;
+  return H('Guru',C.gr.length+' akun guru terdaftar')+`<div class="tools">${chipset('guru.f',G.f,[['off','Belum aktif ('+off+')'],['on','Aktif ('+(C.gr.length-off)+')']])}${srch('guru',G.q,'Cari nama guru')}</div><div id="lst"></div>`;
+}
+function paintGuru(){
+  const G=S.guru,f=C.gr.filter(x=>(G.f==='on')===!!x.status_aktif&&norm(x.nama).includes(norm(G.q)));
+  $('#lst').innerHTML=f.length?table(['Nama','Status',''],f.map(x=>[e(x.nama),x.status_aktif?'<span class="badge ok">Aktif</span>':'<span class="badge warn">Menunggu persetujuan</span>',`<div class="row wrap" style="justify-content:flex-end"><button class="btn sm sec" data-act="ren" data-id="${x.id}" data-v="${e(x.nama)}">Ubah nama</button><button class="btn sm ${x.status_aktif?'danger':''}" data-act="togl" data-id="${x.id}" data-on="${!x.status_aktif}" data-v="${e(x.nama)}">${x.status_aktif?'Nonaktifkan':'Setujui'}</button></div>`])):HK.empty('users',G.f==='off'?'Tidak ada guru yang menunggu persetujuan.':'Belum ada guru aktif.');
+}
+
+/* ---------- Kelas dan mapel ---------- */
+async function master(){
+  const [k,m]=await Promise.all([q(sb.from('kelas').select('*').order('nama_kelas')),q(sb.from('mapels').select('*').order('nama_mapel'))]);C.k=k;C.m=m;
+  const M=S.master;
+  return H('Kelas dan mata pelajaran')+`<div class="tools">${chipset('master.t',M.t,[['kelas','Kelas ('+k.length+')'],['mapel','Mapel ('+m.length+')']])}${srch('master',M.q,'Cari')}</div><div id="mf"></div><div id="lst"></div>`;
+}
+function paintMaster(){
+  const M=S.master,isK=M.t==='kelas',a=isK?C.k:C.m.filter(x=>M.f==='all'||(M.f==='pem')===!!x.peminatan);
+  $('#mf').innerHTML=(isK?'':`<div class="tools" style="margin-top:0">${chipset('master.f',M.f,[['all','Semua'],['umum','Umum'],['pem','Peminatan']])}</div>`)+
+  `<form class="tools" data-form="addm"><input class="input grow" name="v" placeholder="${isK?'Nama kelas baru':'Nama mapel baru'}" aria-label="Nama baru" style="flex:1;min-width:160px">${isK?'':'<select name="pem" class="input" style="width:auto" aria-label="Jenis mapel"><option value="false">Umum</option><option value="true">Peminatan</option></select>'}<button class="btn">${HK.icon('plus')}Tambah</button></form>`;
+  const si=document.querySelector('[data-s=master]');if(si)si.placeholder='Cari '+(isK?'kelas':'mapel');
+  const f=a.filter(x=>norm(isK?x.nama_kelas:x.nama_mapel).includes(norm(M.q)));
+  $('#lst').innerHTML='<div style="height:12px"></div>'+(f.length?table(['Nama',''],f.map(x=>[e(isK?x.nama_kelas:x.nama_mapel)+(!isK&&x.peminatan?' <span class="badge plain">Peminatan</span>':''),`<button class="btn sm danger" data-act="del" data-tb="${isK?'kelas':'mapels'}" data-id="${x.id}" data-n="${e(isK?x.nama_kelas:x.nama_mapel)}">Hapus</button>`])):HK.empty('book','Tidak ada data yang cocok.'));
+}
+
+/* ---------- Pengaturan ---------- */
+async function setv(){
+  const s=await q(sb.from('school_settings').select('*').eq('id',1).single());
+  return H('Pengaturan sekolah')+`<form class="card stack" style="margin-top:16px" data-form="set" novalidate>${fld('sn','Nama sekolah','value="'+e(s.school_name)+'"')}
+  <div class="row"><div class="field grow"><label for="s1">Jam sekolah mulai</label><input id="s1" type="time" class="input" value="${hm(s.start_school_time).replace('.',':')}"><span class="err"></span></div><div class="field grow"><label for="s2">Jam sekolah selesai</label><input id="s2" type="time" class="input" value="${hm(s.end_school_time).replace('.',':')}"><span class="err"></span></div></div>
+  <div class="field"><label for="sw">Batas waktu pencatatan (menit sejak jam mulai)</label><input id="sw" type="number" min="1" class="input" value="${s.attendance_window_minutes}"><span class="err"></span><span class="hint">Setelah batas ini lewat, guru tidak bisa lagi mencatat kehadiran.</span></div>
+  <button class="btn" id="sb">Simpan pengaturan</button></form>`;
+}
+const V={dash,rekap,jurnal,jadwal,guru,master,set:setv},P={jurnal:paintJurnal,jadwal:paintJadwal,guru:paintGuru,master:paintMaster};
+
+/* ---------- Aksi ---------- */
+async function act(b){
+  const a=b.dataset.act,id=b.dataset.id;
+  if(a==='savecfg'){const u=$('#u').value.trim(),k=$('#k').value.trim();if(!/^https:\/\//.test(u))return bad($('#u'),'Alamat harus diawali https://');if(k.length<20)return bad($('#k'),'Key belum lengkap.');try{localStorage.setItem('hadirku_cfg',JSON.stringify({url:u,key:k}))}catch(x){}return boot()}
+  if(a==='resetcfg'){try{localStorage.removeItem('hadirku_cfg')}catch(x){}return setup()}
+  if(a==='login'){const em=$('#em'),pw=$('#pw');if(!em.value.trim())return bad(em,'Email wajib diisi.');if(!pw.value)return bad(pw,'Kata sandi wajib diisi.');
+    return HK.busy(b,async()=>{const r=await sb.auth.signInWithPassword({email:em.value.trim(),password:pw.value});if(r.error)bad(pw,'Email atau kata sandi salah.');else await enter()})}
+  if(a==='logout'){document.querySelectorAll('dialog[open]').forEach(d=>d.close());if(await HK.confirm({title:'Keluar dari HADIRKU Admin?',ok:'Keluar',danger:true})){await sb.auth.signOut();tab='dash';loginUI()}return}
+  if(a==='retry')return render();
+  if(a==='more'){const d=HK.dialog(`<h2 class="h2">Menu lainnya</h2><div class="stack">${TABS.filter(t=>t[3]).map(t=>`<button class="btn sec block" data-go="${t[0]}">${HK.icon(t[2])}${t[1]}</button>`).join('')}<button class="btn danger block" data-act="logout">${HK.icon('logout')}Keluar</button></div>`);d.addEventListener('click',ev=>{const x=ev.target.closest('[data-go],[data-act]');if(x){if(x.dataset.go){tab=x.dataset.go}d.close();if(x.dataset.go)render();else act(x)}});return}
+  if(a==='gen')return HK.busy(b,async()=>{const n=await q(sb.rpc('generate_daily_sessions',{p_tanggal:today()}));HK.toast(n+' sesi dibuat.');render()});
+  if(a==='missed')return HK.busy(b,async()=>{const n=await q(sb.rpc('mark_missed_sessions'));HK.toast(n+' sesi ditandai terlewat.');render()});
+  if(a==='csv'){if(C.csv&&C.csv.length>1){csv(C.csv);HK.toast('Berkas CSV diunduh.')}else HK.toast('Belum ada data untuk diunduh.','bad');return}
+  if(a==='detail')return detail(id);
+  if(a==='addj')return formJadwal();
+  if(a==='togl'){const on=b.dataset.on==='true';
+    if(!on&&!await HK.confirm({title:'Nonaktifkan '+b.dataset.v+'?',text:'Guru ini tidak bisa mencatat kehadiran sampai diaktifkan lagi.',ok:'Ya, nonaktifkan',danger:true}))return;
+    await q(sb.from('profiles').update({status_aktif:on}).eq('id',id));HK.toast(on?'Guru disetujui.':'Guru dinonaktifkan.');return render()}
+  if(a==='ren'){const d=HK.dialog(`<h2 class="h2">Ubah nama guru</h2><form class="stack" novalidate>${fld('rn','Nama lengkap dan gelar','value="'+e(b.dataset.v)+'"')}<div class="acts"><button type="button" class="btn sec" data-x>Batal</button><button class="btn" id="sb">Simpan</button></div></form>`);
+    d.querySelector('[data-x]').onclick=()=>d.close();
+    d.querySelector('form').onsubmit=async ev=>{ev.preventDefault();const n=d.querySelector('#rn');if(!n.value.trim())return bad(n,'Nama tidak boleh kosong.');
+      try{await HK.busy(d.querySelector('#sb'),()=>q(sb.from('profiles').update({nama:n.value.trim()}).eq('id',id)));d.close();HK.toast('Nama diperbarui.');render()}catch(er){HK.toast(er.message,'bad')}};return}
+  if(a==='del'){if(!await HK.confirm({title:'Hapus '+b.dataset.n+'?',text:'Data yang dihapus tidak dapat dikembalikan. Data yang masih dipakai jadwal tidak bisa dihapus.',ok:'Ya, hapus',danger:true}))return;
+    await q(sb.from(b.dataset.tb).delete().eq('id',id));HK.toast('Data dihapus.');return render()}
+}
+async function submit(f){
+  const t=f.dataset.form,d=Object.fromEntries(new FormData(f));
+  if(t==='addm'){const nm=(d.v||'').trim();if(!nm)return HK.toast('Nama tidak boleh kosong.','bad');const isK=S.master.t==='kelas';
+    const row=isK?{nama_kelas:nm}:{nama_mapel:nm,peminatan:d.pem==='true'};
+    await q(sb.from(isK?'kelas':'mapels').insert(row));HK.toast('Ditambahkan.');return render()}
+  if(t==='set'){const n=$('#sn'),w=$('#sw'),s1=$('#s1'),s2=$('#s2');
+    if(!n.value.trim())return bad(n,'Nama sekolah wajib diisi.');
+    if(!s1.value||!s2.value||s2.value<=s1.value)return bad(s2,'Jam selesai harus setelah jam mulai.');
+    if(!(+w.value>=1))return bad(w,'Isi minimal 1 menit.');
+    return HK.busy($('#sb'),async()=>{await q(sb.from('school_settings').update({school_name:n.value.trim(),start_school_time:s1.value,end_school_time:s2.value,attendance_window_minutes:+w.value}).eq('id',1));HK.toast('Pengaturan tersimpan.')})}
+}
+const on=(ev,fn)=>document.addEventListener(ev,fn);
+on('click',ev=>{
+  const t=ev.target.closest('[data-tab]');if(t&&!$('#app').hidden){tab=t.dataset.tab;return render()}
+  const g=ev.target.closest('#view [data-go]');if(g){tab=g.dataset.go;return render()}
+  const c=ev.target.closest('[data-c] .chip');
+  if(c){const grp=c.closest('[data-c]'),[k,f]=grp.dataset.c.split('.');S[k][f]=c.dataset.v;if(k==='master'&&f==='t')S.master.f='all';
+    if(k==='rekap')return render();
+    grp.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',x===c));return P[k]()}
+  const b=ev.target.closest('#auth [data-act],#view [data-act],#nav [data-act]');if(b)act(b).catch(x=>HK.toast(x.message||'Terjadi kesalahan.','bad'));
+});
+on('input',ev=>{const s=ev.target.dataset&&ev.target.dataset.s;if(!s)return;S[s].q=ev.target.value;P[s]&&P[s]()});
+on('change',ev=>{const t=ev.target;
+  if(t.dataset.d==='jurnal'&&t.value){S.jurnal.date=t.value;return render()}
+  if(t.dataset.h){S.jadwal.hari=t.value;paintJadwal()}});
+on('submit',ev=>{ev.preventDefault();submit(ev.target).catch(x=>HK.toast(x.message||'Terjadi kesalahan.','bad'))});
+on('keydown',ev=>{if(ev.key==='Enter'&&ev.target.id==='pw'){const b=document.querySelector('#auth [data-act=login]');if(b)act(b).catch(x=>HK.toast(x.message,'bad'))}});
+function boot(){const c=cfgGet();if(!c)return setup();sb=supabase.createClient(c.url,c.key);enter().catch(x=>HK.toast(x.message||'Gagal terhubung.','bad'))}
+HK.ready(boot);
+})();
+</script>
+</body>
+</html>
